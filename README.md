@@ -248,4 +248,4 @@ chore: configura prettier
 | ----------- | ----------- | ----------- |
 | Rafael Maluf | Trello | RafaMaluf |
 | Henry Mendes | Protótipo | HenryMendesr |
-| [PREENCHER] | [PREENCHER] | [PREENCHER] |
+| Tiago Dagnoluzzo | Testes da API | tiago-dagnoluzzo |
