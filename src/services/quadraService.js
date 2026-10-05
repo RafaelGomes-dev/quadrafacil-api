@@ -24,6 +24,8 @@ const HORARIOS_PADRAO = [
   '22:00',
 ];
 
+const REGEX_HORARIO = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 /**
  * Filtra a lista de quadras conforme os critérios de busca informados pelo
  * jogador/organizador.
@@ -83,13 +85,42 @@ function horarioEstaLivre(quadraId, data, horario) {
   return !existeReservaAtiva;
 }
 
+/** Converte um horário "HH:mm" em minutos desde a meia-noite. */
+function converterParaMinutos(horario) {
+  const [horas, minutos] = String(horario).split(':').map(Number);
+  return horas * 60 + minutos;
+}
+
 /**
- * Monta a grade de horários livres e ocupados de uma quadra em uma data.
+ * Verifica se uma reserva de 1 hora cabe no horário de funcionamento da
+ * quadra (começa depois da abertura e termina até o fechamento).
+ * @param {object} quadra
+ * @param {string} horario - Horário de início no formato HH:mm.
+ * @returns {boolean}
+ */
+function horarioDentroDoFuncionamento(quadra, horario) {
+  if (!quadra?.horarioFuncionamento) return true;
+
+  const { abertura, fechamento } = quadra.horarioFuncionamento;
+  const inicio = converterParaMinutos(horario);
+  return (
+    inicio >= converterParaMinutos(abertura) && inicio + 60 <= converterParaMinutos(fechamento)
+  );
+}
+
+/**
+ * Monta a grade de horários livres e ocupados de uma quadra em uma data,
+ * considerando só os horários dentro do funcionamento da quadra.
  * @param {number} quadraId
  * @param {string} data - Data no formato AAAA-MM-DD.
  * @returns {{horariosLivres: string[], horariosOcupados: string[]}}
  */
 function montarGradeDeHorarios(quadraId, data) {
+  const quadra = buscarQuadraPorId(quadraId);
+  const horariosDaQuadra = HORARIOS_PADRAO.filter((horario) =>
+    horarioDentroDoFuncionamento(quadra, horario)
+  );
+
   const horariosOcupados = reservas
     .filter(
       (reserva) =>
@@ -99,7 +130,7 @@ function montarGradeDeHorarios(quadraId, data) {
     )
     .map((reserva) => reserva.horario);
 
-  const horariosLivres = HORARIOS_PADRAO.filter((horario) => !horariosOcupados.includes(horario));
+  const horariosLivres = horariosDaQuadra.filter((horario) => !horariosOcupados.includes(horario));
 
   return { horariosLivres, horariosOcupados };
 }
@@ -111,7 +142,7 @@ function montarGradeDeHorarios(quadraId, data) {
  */
 function validarDadosDeQuadra(dadosQuadra) {
   const erros = [];
-  const { nome, endereco, cidade, esporte, precoHora } = dadosQuadra;
+  const { nome, endereco, cidade, esporte, precoHora, horarioFuncionamento } = dadosQuadra;
 
   if (!nome || !String(nome).trim()) erros.push('O campo "nome" é obrigatório.');
   if (!endereco || !String(endereco).trim()) erros.push('O campo "endereco" é obrigatório.');
@@ -121,6 +152,16 @@ function validarDadosDeQuadra(dadosQuadra) {
     erros.push('O campo "precoHora" é obrigatório.');
   } else if (Number.isNaN(Number(precoHora)) || Number(precoHora) <= 0) {
     erros.push('O campo "precoHora" precisa ser um número maior que zero.');
+  }
+  if (horarioFuncionamento !== undefined) {
+    const { abertura, fechamento } = horarioFuncionamento || {};
+    if (!REGEX_HORARIO.test(abertura) || !REGEX_HORARIO.test(fechamento)) {
+      erros.push(
+        'O campo "horarioFuncionamento" precisa ter "abertura" e "fechamento" no formato HH:mm.'
+      );
+    } else if (fechamento <= abertura) {
+      erros.push('O horário de fechamento precisa ser depois da abertura.');
+    }
   }
 
   return erros;
@@ -147,10 +188,12 @@ function cadastrarQuadra(dadosQuadra) {
       coberta: Boolean(dadosQuadra.estrutura?.coberta),
     },
     fotos: Array.isArray(dadosQuadra.fotos) ? dadosQuadra.fotos : [],
-    horarioFuncionamento: dadosQuadra.horarioFuncionamento || {
-      abertura: '08:00',
-      fechamento: '22:00',
-    },
+    horarioFuncionamento: dadosQuadra.horarioFuncionamento
+      ? {
+          abertura: dadosQuadra.horarioFuncionamento.abertura,
+          fechamento: dadosQuadra.horarioFuncionamento.fechamento,
+        }
+      : { abertura: '08:00', fechamento: '22:00' },
     descricao: dadosQuadra.descricao || '',
   };
 
@@ -163,6 +206,7 @@ module.exports = {
   buscarQuadrasComFiltros,
   buscarQuadraPorId,
   horarioEstaLivre,
+  horarioDentroDoFuncionamento,
   montarGradeDeHorarios,
   validarDadosDeQuadra,
   cadastrarQuadra,

@@ -36,15 +36,21 @@ function criarReserva(req, res) {
 
 /**
  * PATCH /api/reservas/:id/cancelar
- * Cancela uma reserva, liberando o horário para novas reservas.
+ * Cancela uma reserva, liberando o horário para novas reservas
+ * (retorna 400 se ela já estiver cancelada).
  */
 function cancelarReserva(req, res) {
-  const reservaCancelada = reservaService.cancelarReserva(req.params.id);
+  const reserva = reservaService.buscarReservaPorId(req.params.id);
 
-  if (!reservaCancelada) {
+  if (!reserva) {
     return res.status(404).json({ error: 'Reserva não encontrada.' });
   }
 
+  if (reserva.status === 'cancelada') {
+    return res.status(400).json({ error: 'Esta reserva já está cancelada.' });
+  }
+
+  const reservaCancelada = reservaService.cancelarReserva(req.params.id);
   res.status(200).json(reservaCancelada);
 }
 

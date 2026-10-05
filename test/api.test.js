@@ -34,6 +34,106 @@ async function requisicao(caminho, opcoes = {}) {
   return { status: resposta.status, corpo: await resposta.json() };
 }
 
+test('retorna status da API', async () => {
+  const resposta = await requisicao('/health');
+
+  assert.equal(resposta.status, 200);
+  assert.deepEqual(resposta.corpo, { status: 'API running!' });
+});
+
+test('retorna erro para rota inexistente', async () => {
+  const resposta = await requisicao('/rota-inexistente');
+
+  assert.equal(resposta.status, 404);
+  assert.deepEqual(resposta.corpo, { error: 'Rota não encontrada' });
+});
+
+test('lista quadras cadastradas', async () => {
+  const resposta = await requisicao('/quadras');
+
+  assert.equal(resposta.status, 200);
+  assert.ok(Array.isArray(resposta.corpo));
+  assert.ok(resposta.corpo.some((quadra) => quadra.id === 1));
+});
+
+test('filtra quadras por bairro sem acento, esporte e preço máximo', async () => {
+  const resposta = await requisicao(
+    '/quadras?bairro=agua%20verde&esporte=beach%20tennis&precoMax=100'
+  );
+
+  assert.equal(resposta.status, 200);
+  assert.equal(resposta.corpo.length, 1);
+  assert.equal(resposta.corpo[0].id, 4);
+  assert.equal(resposta.corpo[0].nome, 'Beach Sports Água Verde');
+});
+
+test('consulta quadra por id e retorna erro quando não existe', async () => {
+  const quadra = await requisicao('/quadras/1');
+
+  assert.equal(quadra.status, 200);
+  assert.equal(quadra.corpo.id, 1);
+
+  const inexistente = await requisicao('/quadras/999');
+
+  assert.equal(inexistente.status, 404);
+  assert.deepEqual(inexistente.corpo, { error: 'Quadra não encontrada.' });
+});
+
+test('cadastra uma quadra valida', async () => {
+  const dados = {
+    nome: 'Centro Esportivo Portao Tenis',
+    endereco: 'Rua Professor Joao Doetzer, 450',
+    cidade: 'Curitiba',
+    bairro: 'Portao',
+    esporte: 'tenis',
+    precoHora: 110,
+  };
+
+  const resposta = await requisicao('/quadras', {
+    method: 'POST',
+    body: JSON.stringify(dados),
+  });
+
+  assert.equal(resposta.status, 201);
+  assert.equal(typeof resposta.corpo.id, 'number');
+  assert.equal(resposta.corpo.nome, dados.nome);
+  assert.equal(resposta.corpo.cidade, dados.cidade);
+  assert.equal(resposta.corpo.esporte, dados.esporte);
+  assert.equal(resposta.corpo.precoHora, dados.precoHora);
+});
+
+test('rejeita cadastro de quadra sem campo obrigatorio', async () => {
+  const resposta = await requisicao('/quadras', {
+    method: 'POST',
+    body: JSON.stringify({
+      endereco: 'Rua Teste, 100',
+      cidade: 'Curitiba',
+      esporte: 'tenis',
+      precoHora: 80,
+    }),
+  });
+
+  assert.equal(resposta.status, 400);
+  assert.equal(resposta.corpo.error, 'Dados inválidos.');
+  assert.ok(resposta.corpo.detalhes.some((detalhe) => detalhe.includes('"nome"')));
+});
+
+test('rejeita cadastro de quadra com preco invalido', async () => {
+  const resposta = await requisicao('/quadras', {
+    method: 'POST',
+    body: JSON.stringify({
+      nome: 'Quadra Teste Preco Invalido',
+      endereco: 'Rua Teste, 200',
+      cidade: 'Curitiba',
+      esporte: 'tenis',
+      precoHora: 0,
+    }),
+  });
+
+  assert.equal(resposta.status, 400);
+  assert.ok(resposta.corpo.detalhes.some((detalhe) => detalhe.includes('maior que zero')));
+});
+
 function dadosDeReserva(sobrescritas = {}) {
   return {
     quadraId: 1,

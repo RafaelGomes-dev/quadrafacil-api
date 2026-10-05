@@ -46,7 +46,6 @@ npm start
 
 A API sobe por padrão em `http://localhost:3001`.
 
-
 ## Testes automatizados
 
 Os testes usam o test runner nativo do Node, sem precisar instalar nada a mais:
@@ -111,11 +110,11 @@ Base URL: `http://localhost:3001/api`
 | GET    | `/health`                | Verifica se a API está no ar                       | 200               | -                                   |
 | GET    | `/quadras`               | Lista quadras com filtros opcionais (query string) | 200               | -                                   |
 | GET    | `/quadras/:id`           | Detalha uma quadra                                 | 200               | 404 (não encontrada)                |
-| GET    | `/quadras/:id/horarios`  | Horários livres/ocupados de uma quadra em uma data | 200               | 400 (sem `data`), 404               |
+| GET    | `/quadras/:id/horarios`  | Horários livres/ocupados de uma quadra em uma data | 200               | 400 (`data` ausente/inválida), 404  |
 | POST   | `/quadras`               | Cadastra uma nova quadra                           | 201               | 400 (dados inválidos)               |
 | GET    | `/reservas`              | Lista reservas (aceita `?quadraId=`)               | 200               | -                                   |
 | POST   | `/reservas`              | Cria uma reserva (status inicial "pendente")       | 201               | 400, 409 (conflito)                 |
-| PATCH  | `/reservas/:id/cancelar` | Cancela uma reserva, liberando o horário           | 200               | 404 (não encontrada)                |
+| PATCH  | `/reservas/:id/cancelar` | Cancela uma reserva, liberando o horário           | 200               | 400 (já cancelada), 404             |
 | POST   | `/pagamentos`            | Simula o pagamento e confirma a reserva vinculada  | 201               | 400, 404, 409 (pagamento duplicado) |
 
 ### GET /api/health
@@ -163,11 +162,11 @@ Resposta 404:
 
 ### GET /api/quadras/1/horarios?data=2026-10-10
 
-Resposta 200:
+Resposta 200 (só aparecem horários dentro do funcionamento da quadra):
 
 ```json
 {
-  "horariosLivres": ["07:00", "08:00", "09:00", "..."],
+  "horariosLivres": ["08:00", "09:00", "10:00", "..."],
   "horariosOcupados": ["19:00"]
 }
 ```
@@ -184,9 +183,13 @@ Request body:
   "bairro": "Centro",
   "esporte": "society",
   "precoHora": 150,
-  "estrutura": { "vestiario": true, "estacionamento": false, "iluminacao": true, "coberta": false }
+  "estrutura": { "vestiario": true, "estacionamento": false, "iluminacao": true, "coberta": false },
+  "horarioFuncionamento": { "abertura": "08:00", "fechamento": "22:00" }
 }
 ```
+
+`horarioFuncionamento` é opcional (padrão: 08:00 às 22:00). Se enviado, `abertura` e `fechamento`
+precisam estar no formato HH:mm e o fechamento tem que ser depois da abertura.
 
 Resposta 201: a quadra criada, com `id` incremental.
 
@@ -225,6 +228,12 @@ Resposta 409 (mesma quadra/data/horário já reservados):
 
 Resposta 200: a reserva com `status: "cancelada"`.
 
+Resposta 400 (a reserva já estava cancelada):
+
+```json
+{ "error": "Esta reserva já está cancelada." }
+```
+
 ### POST /api/pagamentos
 
 Request body:
@@ -256,10 +265,10 @@ chore: configura prettier
 
 ## Equipe
 
-| Nome        | Função      | GitHub      |
-| ----------- | ----------- | ----------- |
-| Rafael Maluf | Trello | RafaMaluf |
-| Henry Mendes | Protótipo | HenryMendesr |
-| Rafael Gomes | Back-end: estrutura do projeto, rotas de quadras, reservas e pagamento simulado, regras de conflito de horário e documentação da API | RafaelGomes-dev |
-| Erick Meister  | Documentação e alterações | Minimeister05 |
-
+| Nome             | Função                                            | GitHub           |
+| ---------------- | ------------------------------------------------- | ---------------- |
+| Rafael Gomes     | Back-end, regras de negócio e documentação da API | RafaelGomes-dev  |
+| Rafael Maluf     | Organização do Trello, validações e testes        | RafaMaluf        |
+| Henry Mendes     | Protótipo e documentação                          | HenryMendesr     |
+| Tiago Dagnoluzzo | Testes da API e documentação                      | tiago-dagnoluzzo |
+| Erick Meister    | Documentação e ajustes técnicos                   | Minimeister05    |

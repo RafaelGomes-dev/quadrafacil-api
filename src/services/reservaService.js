@@ -4,7 +4,11 @@
  */
 
 const { reservas, gerarProximoIdReserva } = require('../data/mockData');
-const { buscarQuadraPorId, HORARIOS_PADRAO } = require('./quadraService');
+const {
+  buscarQuadraPorId,
+  horarioDentroDoFuncionamento,
+  HORARIOS_PADRAO,
+} = require('./quadraService');
 
 const REGEX_DATA = /^\d{4}-\d{2}-\d{2}$/;
 const REGEX_HORARIO = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -75,6 +79,8 @@ function validarDadosDeReserva(dadosReserva) {
     erros.push('O campo "horario" é obrigatório e deve estar no formato HH:mm.');
   } else if (!HORARIOS_PADRAO.includes(horario)) {
     erros.push('O campo "horario" deve corresponder a um horário disponível da grade.');
+  } else if (quadraId && !horarioDentroDoFuncionamento(buscarQuadraPorId(quadraId), horario)) {
+    erros.push('O horário escolhido está fora do horário de funcionamento da quadra.');
   }
 
   return erros;
