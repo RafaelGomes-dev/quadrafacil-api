@@ -24,6 +24,8 @@ const HORARIOS_PADRAO = [
   '22:00',
 ];
 
+const REGEX_HORARIO = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 /**
  * Filtra a lista de quadras conforme os critérios de busca informados pelo
  * jogador/organizador.
@@ -140,7 +142,7 @@ function montarGradeDeHorarios(quadraId, data) {
  */
 function validarDadosDeQuadra(dadosQuadra) {
   const erros = [];
-  const { nome, endereco, cidade, esporte, precoHora } = dadosQuadra;
+  const { nome, endereco, cidade, esporte, precoHora, horarioFuncionamento } = dadosQuadra;
 
   if (!nome || !String(nome).trim()) erros.push('O campo "nome" é obrigatório.');
   if (!endereco || !String(endereco).trim()) erros.push('O campo "endereco" é obrigatório.');
@@ -150,6 +152,16 @@ function validarDadosDeQuadra(dadosQuadra) {
     erros.push('O campo "precoHora" é obrigatório.');
   } else if (Number.isNaN(Number(precoHora)) || Number(precoHora) <= 0) {
     erros.push('O campo "precoHora" precisa ser um número maior que zero.');
+  }
+  if (horarioFuncionamento !== undefined) {
+    const { abertura, fechamento } = horarioFuncionamento || {};
+    if (!REGEX_HORARIO.test(abertura) || !REGEX_HORARIO.test(fechamento)) {
+      erros.push(
+        'O campo "horarioFuncionamento" precisa ter "abertura" e "fechamento" no formato HH:mm.'
+      );
+    } else if (fechamento <= abertura) {
+      erros.push('O horário de fechamento precisa ser depois da abertura.');
+    }
   }
 
   return erros;
@@ -176,10 +188,12 @@ function cadastrarQuadra(dadosQuadra) {
       coberta: Boolean(dadosQuadra.estrutura?.coberta),
     },
     fotos: Array.isArray(dadosQuadra.fotos) ? dadosQuadra.fotos : [],
-    horarioFuncionamento: dadosQuadra.horarioFuncionamento || {
-      abertura: '08:00',
-      fechamento: '22:00',
-    },
+    horarioFuncionamento: dadosQuadra.horarioFuncionamento
+      ? {
+          abertura: dadosQuadra.horarioFuncionamento.abertura,
+          fechamento: dadosQuadra.horarioFuncionamento.fechamento,
+        }
+      : { abertura: '08:00', fechamento: '22:00' },
     descricao: dadosQuadra.descricao || '',
   };
 

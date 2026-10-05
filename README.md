@@ -172,9 +172,13 @@ Request body:
   "bairro": "Centro",
   "esporte": "society",
   "precoHora": 150,
-  "estrutura": { "vestiario": true, "estacionamento": false, "iluminacao": true, "coberta": false }
+  "estrutura": { "vestiario": true, "estacionamento": false, "iluminacao": true, "coberta": false },
+  "horarioFuncionamento": { "abertura": "08:00", "fechamento": "22:00" }
 }
 ```
+
+`horarioFuncionamento` é opcional (padrão: 08:00 às 22:00). Se enviado, `abertura` e `fechamento`
+precisam estar no formato HH:mm e o fechamento tem que ser depois da abertura.
 
 Resposta 201: a quadra criada, com `id` incremental.
 
