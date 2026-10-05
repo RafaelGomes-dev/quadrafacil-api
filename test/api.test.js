@@ -34,6 +34,20 @@ async function requisicao(caminho, opcoes = {}) {
   return { status: resposta.status, corpo: await resposta.json() };
 }
 
+test('retorna status da API', async () => {
+  const resposta = await requisicao('/health');
+
+  assert.equal(resposta.status, 200);
+  assert.deepEqual(resposta.corpo, { status: 'API running!' });
+});
+
+test('retorna erro para rota inexistente', async () => {
+  const resposta = await requisicao('/rota-inexistente');
+
+  assert.equal(resposta.status, 404);
+  assert.deepEqual(resposta.corpo, { error: 'Rota não encontrada' });
+});
+
 function dadosDeReserva(sobrescritas = {}) {
   return {
     quadraId: 1,
