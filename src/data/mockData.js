@@ -134,6 +134,24 @@ const quadras = [
     horarioFuncionamento: { abertura: '08:00', fechamento: '23:30' },
     descricao: 'Duas quadras society lado a lado, boa opção para campeonatos entre amigos.',
   },
+  {
+    id: 8,
+    nome: 'Quadra Portão Futsal',
+    endereco: 'Av. República Argentina, 3500',
+    cidade: 'Curitiba',
+    bairro: 'Portão',
+    esporte: 'futsal',
+    precoHora: 110,
+    estrutura: {
+      vestiario: true,
+      estacionamento: true,
+      iluminacao: true,
+      coberta: true,
+    },
+    fotos: ['https://picsum.photos/seed/portao-futsal/600/400'],
+    horarioFuncionamento: { abertura: '08:00', fechamento: '22:00' },
+    descricao: 'Quadra coberta com piso de madeira, perto do Shopping Palladium.',
+  },
 ];
 
 const reservas = [

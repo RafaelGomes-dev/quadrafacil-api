@@ -46,6 +46,17 @@ npm start
 
 A API sobe por padrão em `http://localhost:3001`.
 
+## Testes automatizados
+
+Os testes usam o test runner nativo do Node, sem precisar instalar nada a mais:
+
+```bash
+npm test
+```
+
+Eles sobem a API em uma porta aleatória e cobrem as rotas de quadras, reservas e pagamentos,
+incluindo os casos de erro (dados inválidos, conflito de horário e pagamento duplicado).
+
 ## Variáveis de ambiente
 
 Copie `.env.example` para `.env` e ajuste se necessário:
@@ -254,8 +265,10 @@ chore: configura prettier
 
 ## Equipe
 
-| Nome        | Função      | GitHub      |
-| ----------- | ----------- | ----------- |
-| Rafael Maluf | Trello | RafaMaluf |
-| Henry Mendes | Protótipo | HenryMendesr |
-| Tiago Dagnoluzzo | Testes da API | tiago-dagnoluzzo |
+| Nome             | Função                                            | GitHub           |
+| ---------------- | ------------------------------------------------- | ---------------- |
+| Rafael Gomes     | Back-end, regras de negócio e documentação da API | RafaelGomes-dev  |
+| Rafael Maluf     | Organização do Trello, validações e testes        | RafaMaluf        |
+| Henry Mendes     | Protótipo e documentação                          | HenryMendesr     |
+| Tiago Dagnoluzzo | Testes da API e documentação                      | tiago-dagnoluzzo |
+| Erick Meister    | Documentação e ajustes técnicos                   | Minimeister05    |
