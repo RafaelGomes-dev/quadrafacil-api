@@ -79,6 +79,61 @@ test('consulta quadra por id e retorna erro quando não existe', async () => {
   assert.deepEqual(inexistente.corpo, { error: 'Quadra não encontrada.' });
 });
 
+test('cadastra uma quadra valida', async () => {
+  const dados = {
+    nome: 'Centro Esportivo Portao Tenis',
+    endereco: 'Rua Professor Joao Doetzer, 450',
+    cidade: 'Curitiba',
+    bairro: 'Portao',
+    esporte: 'tenis',
+    precoHora: 110,
+  };
+
+  const resposta = await requisicao('/quadras', {
+    method: 'POST',
+    body: JSON.stringify(dados),
+  });
+
+  assert.equal(resposta.status, 201);
+  assert.equal(typeof resposta.corpo.id, 'number');
+  assert.equal(resposta.corpo.nome, dados.nome);
+  assert.equal(resposta.corpo.cidade, dados.cidade);
+  assert.equal(resposta.corpo.esporte, dados.esporte);
+  assert.equal(resposta.corpo.precoHora, dados.precoHora);
+});
+
+test('rejeita cadastro de quadra sem campo obrigatorio', async () => {
+  const resposta = await requisicao('/quadras', {
+    method: 'POST',
+    body: JSON.stringify({
+      endereco: 'Rua Teste, 100',
+      cidade: 'Curitiba',
+      esporte: 'tenis',
+      precoHora: 80,
+    }),
+  });
+
+  assert.equal(resposta.status, 400);
+  assert.equal(resposta.corpo.error, 'Dados inválidos.');
+  assert.ok(resposta.corpo.detalhes.some((detalhe) => detalhe.includes('"nome"')));
+});
+
+test('rejeita cadastro de quadra com preco invalido', async () => {
+  const resposta = await requisicao('/quadras', {
+    method: 'POST',
+    body: JSON.stringify({
+      nome: 'Quadra Teste Preco Invalido',
+      endereco: 'Rua Teste, 200',
+      cidade: 'Curitiba',
+      esporte: 'tenis',
+      precoHora: 0,
+    }),
+  });
+
+  assert.equal(resposta.status, 400);
+  assert.ok(resposta.corpo.detalhes.some((detalhe) => detalhe.includes('maior que zero')));
+});
+
 function dadosDeReserva(sobrescritas = {}) {
   return {
     quadraId: 1,
