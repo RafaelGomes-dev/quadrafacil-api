@@ -48,6 +48,37 @@ test('retorna erro para rota inexistente', async () => {
   assert.deepEqual(resposta.corpo, { error: 'Rota não encontrada' });
 });
 
+test('lista quadras cadastradas', async () => {
+  const resposta = await requisicao('/quadras');
+
+  assert.equal(resposta.status, 200);
+  assert.ok(Array.isArray(resposta.corpo));
+  assert.ok(resposta.corpo.some((quadra) => quadra.id === 1));
+});
+
+test('filtra quadras por bairro sem acento, esporte e preço máximo', async () => {
+  const resposta = await requisicao(
+    '/quadras?bairro=agua%20verde&esporte=beach%20tennis&precoMax=100'
+  );
+
+  assert.equal(resposta.status, 200);
+  assert.equal(resposta.corpo.length, 1);
+  assert.equal(resposta.corpo[0].id, 4);
+  assert.equal(resposta.corpo[0].nome, 'Beach Sports Água Verde');
+});
+
+test('consulta quadra por id e retorna erro quando não existe', async () => {
+  const quadra = await requisicao('/quadras/1');
+
+  assert.equal(quadra.status, 200);
+  assert.equal(quadra.corpo.id, 1);
+
+  const inexistente = await requisicao('/quadras/999');
+
+  assert.equal(inexistente.status, 404);
+  assert.deepEqual(inexistente.corpo, { error: 'Quadra não encontrada.' });
+});
+
 function dadosDeReserva(sobrescritas = {}) {
   return {
     quadraId: 1,
