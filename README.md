@@ -248,4 +248,5 @@ chore: configura prettier
 | ----------- | ----------- | ----------- |
 | Rafael Maluf | Trello | RafaMaluf |
 | Henry Mendes | Protótipo | HenryMendesr |
-| [PREENCHER] | [PREENCHER] | [PREENCHER] |
+| Rafael Gomes | Back-end: estrutura do projeto, rotas de quadras, reservas e pagamento simulado, regras de conflito de horário e documentação da API | RafaelGomes-dev |
+
