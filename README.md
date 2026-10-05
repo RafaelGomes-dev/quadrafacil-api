@@ -246,6 +246,6 @@ chore: configura prettier
 
 | Nome        | Função      | GitHub      |
 | ----------- | ----------- | ----------- |
-| [PREENCHER] | [PREENCHER] | [PREENCHER] |
-| [PREENCHER] | [PREENCHER] | [PREENCHER] |
+| Rafael Maluf | Trello | RafaMaluf |
+| Henry Mendes | Protótipo | HenryMendesr |
 | [PREENCHER] | [PREENCHER] | [PREENCHER] |
