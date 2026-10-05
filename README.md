@@ -103,7 +103,7 @@ Base URL: `http://localhost:3001/api`
 | POST   | `/quadras`               | Cadastra uma nova quadra                           | 201               | 400 (dados inválidos)               |
 | GET    | `/reservas`              | Lista reservas (aceita `?quadraId=`)               | 200               | -                                   |
 | POST   | `/reservas`              | Cria uma reserva (status inicial "pendente")       | 201               | 400, 409 (conflito)                 |
-| PATCH  | `/reservas/:id/cancelar` | Cancela uma reserva, liberando o horário           | 200               | 404 (não encontrada)                |
+| PATCH  | `/reservas/:id/cancelar` | Cancela uma reserva, liberando o horário           | 200               | 400 (já cancelada), 404             |
 | POST   | `/pagamentos`            | Simula o pagamento e confirma a reserva vinculada  | 201               | 400, 404, 409 (pagamento duplicado) |
 
 ### GET /api/health
@@ -216,6 +216,12 @@ Resposta 409 (mesma quadra/data/horário já reservados):
 ### PATCH /api/reservas/:id/cancelar
 
 Resposta 200: a reserva com `status: "cancelada"`.
+
+Resposta 400 (a reserva já estava cancelada):
+
+```json
+{ "error": "Esta reserva já está cancelada." }
+```
 
 ### POST /api/pagamentos
 
