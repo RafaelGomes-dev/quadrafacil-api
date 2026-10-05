@@ -49,7 +49,7 @@ function obterHorariosDaQuadra(req, res) {
   }
 
   const { data } = req.query;
-  if (!data) {
+  if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
     return res
       .status(400)
       .json({ error: 'O parâmetro "data" é obrigatório (formato AAAA-MM-DD).' });

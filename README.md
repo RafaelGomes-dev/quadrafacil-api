@@ -99,7 +99,7 @@ Base URL: `http://localhost:3001/api`
 | GET    | `/health`                | Verifica se a API está no ar                       | 200               | -                                   |
 | GET    | `/quadras`               | Lista quadras com filtros opcionais (query string) | 200               | -                                   |
 | GET    | `/quadras/:id`           | Detalha uma quadra                                 | 200               | 404 (não encontrada)                |
-| GET    | `/quadras/:id/horarios`  | Horários livres/ocupados de uma quadra em uma data | 200               | 400 (sem `data`), 404               |
+| GET    | `/quadras/:id/horarios`  | Horários livres/ocupados de uma quadra em uma data | 200               | 400 (`data` ausente/inválida), 404  |
 | POST   | `/quadras`               | Cadastra uma nova quadra                           | 201               | 400 (dados inválidos)               |
 | GET    | `/reservas`              | Lista reservas (aceita `?quadraId=`)               | 200               | -                                   |
 | POST   | `/reservas`              | Cria uma reserva (status inicial "pendente")       | 201               | 400, 409 (conflito)                 |
@@ -151,11 +151,11 @@ Resposta 404:
 
 ### GET /api/quadras/1/horarios?data=2026-10-10
 
-Resposta 200:
+Resposta 200 (só aparecem horários dentro do funcionamento da quadra):
 
 ```json
 {
-  "horariosLivres": ["07:00", "08:00", "09:00", "..."],
+  "horariosLivres": ["08:00", "09:00", "10:00", "..."],
   "horariosOcupados": ["19:00"]
 }
 ```

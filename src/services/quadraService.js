@@ -83,13 +83,42 @@ function horarioEstaLivre(quadraId, data, horario) {
   return !existeReservaAtiva;
 }
 
+/** Converte um horário "HH:mm" em minutos desde a meia-noite. */
+function converterParaMinutos(horario) {
+  const [horas, minutos] = String(horario).split(':').map(Number);
+  return horas * 60 + minutos;
+}
+
 /**
- * Monta a grade de horários livres e ocupados de uma quadra em uma data.
+ * Verifica se uma reserva de 1 hora cabe no horário de funcionamento da
+ * quadra (começa depois da abertura e termina até o fechamento).
+ * @param {object} quadra
+ * @param {string} horario - Horário de início no formato HH:mm.
+ * @returns {boolean}
+ */
+function horarioDentroDoFuncionamento(quadra, horario) {
+  if (!quadra?.horarioFuncionamento) return true;
+
+  const { abertura, fechamento } = quadra.horarioFuncionamento;
+  const inicio = converterParaMinutos(horario);
+  return (
+    inicio >= converterParaMinutos(abertura) && inicio + 60 <= converterParaMinutos(fechamento)
+  );
+}
+
+/**
+ * Monta a grade de horários livres e ocupados de uma quadra em uma data,
+ * considerando só os horários dentro do funcionamento da quadra.
  * @param {number} quadraId
  * @param {string} data - Data no formato AAAA-MM-DD.
  * @returns {{horariosLivres: string[], horariosOcupados: string[]}}
  */
 function montarGradeDeHorarios(quadraId, data) {
+  const quadra = buscarQuadraPorId(quadraId);
+  const horariosDaQuadra = HORARIOS_PADRAO.filter((horario) =>
+    horarioDentroDoFuncionamento(quadra, horario)
+  );
+
   const horariosOcupados = reservas
     .filter(
       (reserva) =>
@@ -99,7 +128,7 @@ function montarGradeDeHorarios(quadraId, data) {
     )
     .map((reserva) => reserva.horario);
 
-  const horariosLivres = HORARIOS_PADRAO.filter((horario) => !horariosOcupados.includes(horario));
+  const horariosLivres = horariosDaQuadra.filter((horario) => !horariosOcupados.includes(horario));
 
   return { horariosLivres, horariosOcupados };
 }
@@ -163,6 +192,7 @@ module.exports = {
   buscarQuadrasComFiltros,
   buscarQuadraPorId,
   horarioEstaLivre,
+  horarioDentroDoFuncionamento,
   montarGradeDeHorarios,
   validarDadosDeQuadra,
   cadastrarQuadra,
