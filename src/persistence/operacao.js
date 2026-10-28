@@ -175,7 +175,7 @@ function operacao(db) {
           exigir(dataValida(e.de)&&dataValida(e.ate)&&e.ate>=e.de&&Date.parse(e.ate)-Date.parse(e.de)<=366*86400000,'Vigência inválida; máximo de um ano.');
           exigir(Number.isInteger(Number(e.dia)) && Number(e.dia)>=0 && Number(e.dia)<=6 && Number.isFinite(e.valorMensal)&&e.valorMensal>0,'Mensalista inválido.');
           exigir(!e.excecoes || (Array.isArray(e.excecoes)&&e.excecoes.every(dataValida)),'Exceções inválidas.');
-        } else exigir(Number.isFinite(e.valor)&&e.valor>0&&['data','semana'].includes(e.tipo)&&(e.tipo==='data'?dataValida(e.data):Number(e.dia)>=0&&Number(e.dia)<=6),'Regra de preço inválida.');
+        } else exigir(Number.isFinite(e.valor)&&e.valor>0&&['data','semanal'].includes(e.tipo)&&(e.tipo==='data'?dataValida(e.data):Number.isInteger(Number(e.dia))&&Number(e.dia)>=0&&Number(e.dia)<=6),'Regra de preço inválida.');
       }
     }
     exigir(anteriores.eventos.every(e=>s.eventos.some(n=>String(n.id)===String(e.id))),'Cancele reservas em vez de excluir o histórico.');
