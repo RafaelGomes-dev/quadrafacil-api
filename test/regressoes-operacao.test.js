@@ -22,6 +22,74 @@ function preparar(t, relogio = '2027-03-15T20:00:00Z') {
   };
 }
 const erro = (fn, status = 400) => assert.throws(fn, (e) => e.status === status);
+
+test('reserva existente não pode mudar de quadra, horário, data ou tipo pelo PUT', (t) => {
+  const { s } = preparar(t);
+  const r = s.checkout({
+    ...cliente,
+    metodo: 'pix',
+    itens: [{ quadraId: 'nova-teste', data: '2027-03-16', horario: '10:00' }],
+  }).reservas[0];
+  for (const alteracao of [
+    { data: '2027-03-15', inicio: '08:00', fim: '09:00' },
+    { data: '2027-03-17' },
+    { quadraId: 1 },
+    { tipo: 'bloqueio' },
+    { inicio: '11:00', fim: '12:00' },
+    { origem: 'WhatsApp' },
+  ]) {
+    const g = s.gestor();
+    Object.assign(
+      g.eventos.find((e) => e.id === r.id),
+      alteracao
+    );
+    erro(() => s.salvarGestor(g));
+    assert.ok(!s.grade('nova-teste', r.data).horariosLivres.includes('10:00'));
+  }
+  const g = s.gestor();
+  Object.assign(
+    g.eventos.find((e) => e.id === r.id),
+    {
+      status: 'cancelada',
+      motivoCancelamento: 'Teste',
+      reembolso: 'pendente',
+    }
+  );
+  s.salvarGestor(g);
+  assert.ok(s.grade('nova-teste', r.data).horariosLivres.includes('10:00'));
+});
+
+test('checkout com preço desatualizado reverte tudo e permite reconfirmar o novo total', (t) => {
+  const { s, db } = preparar(t);
+  const pedido = {
+    ...cliente,
+    chave: 'revisao-preco',
+    metodo: 'pix',
+    totalEsperado: 180,
+    itens: [{ quadraId: 'nova-teste', data: '2027-03-16', horario: '10:00' }],
+  };
+  const g = s.gestor();
+  g.regras.push({
+    id: 'reajuste',
+    quadraId: 'nova-teste',
+    tipo: 'data',
+    data: '2027-03-16',
+    inicio: '10:00',
+    fim: '11:00',
+    valor: 200,
+  });
+  s.salvarGestor(g);
+  const antes = s.gestor().revisao;
+  const pagamentos = db.prepare('SELECT COUNT(*) AS n FROM pagamentos').get().n;
+  erro(() => s.checkout(pedido), 409);
+  assert.equal(s.gestor().revisao, antes);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM pagamentos').get().n, pagamentos);
+  assert.ok(s.grade('nova-teste', '2027-03-16').horariosLivres.includes('10:00'));
+  const atualizado = { ...pedido, totalEsperado: 200 };
+  const r = s.checkout(atualizado);
+  assert.equal(r.total, 200);
+  assert.deepEqual(s.checkout(atualizado), r);
+});
 test('fuso de Curitiba não depende do timezone do host, inclusive virada de dia', () => {
   assert.equal(instanteLocal(new Date('2027-03-16T01:30:00Z')), '2027-03-15T22:30:00');
   assert.equal(instanteLocal(new Date('2027-03-16T03:00:00Z')), '2027-03-16T00:00:00');

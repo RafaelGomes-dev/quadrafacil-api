@@ -455,6 +455,13 @@ function operacao(db, { agora = () => new Date() } = {}) {
         const q = s.quadras.find((q) => String(q.id) === String(e.quadraId));
         intervalo(e, q);
         if (table === 'eventos') {
+          if (antigo)
+            exigir(
+              ['quadraId', 'data', 'inicio', 'fim', 'tipo', 'origem'].every(
+                (campo) => String(e[campo]) === String(antigo[campo])
+              ),
+              'Cancele a reserva e crie outra para mudar a quadra, data ou intervalo.'
+            );
           if (!antigo && e.status !== 'cancelada' && e.tipo !== 'mensalista')
             exigir(
               inicioFuturo(e.data, e.inicio),
@@ -663,6 +670,7 @@ function operacao(db, { agora = () => new Date() } = {}) {
           nomeCliente: d.nomeCliente,
           telefoneCliente: d.telefoneCliente,
           metodo: d.metodo,
+          totalEsperado: d.totalEsperado,
         });
         if (d.chave) {
           exigir(
@@ -700,11 +708,25 @@ function operacao(db, { agora = () => new Date() } = {}) {
           criar({ ...i, nomeCliente: d.nomeCliente, telefoneCliente: d.telefoneCliente })
         );
         const pagamentos = reservas.map((r) => pagar(r.id, d.metodo));
+        const total = pagamentos.reduce((s, p) => s + Math.round(p.valor * 100), 0) / 100;
+        if (d.totalEsperado !== undefined)
+          exigir(
+            typeof d.totalEsperado === 'number' &&
+              Number.isFinite(d.totalEsperado) &&
+              d.totalEsperado >= 0,
+            'Total esperado inválido.'
+          );
+        exigir(
+          d.totalEsperado === undefined ||
+            Math.round(d.totalEsperado * 100) === Math.round(total * 100),
+          'O preço foi atualizado. Revise o novo total antes de confirmar novamente.',
+          409
+        );
         incrementar();
         const resposta = {
           reservas: reservas.map((r) => comoReserva(buscar('eventos', r.id))),
           pagamentos,
-          total: pagamentos.reduce((s, p) => s + p.valor, 0),
+          total,
           simulado: true,
         };
         if (d.chave)
