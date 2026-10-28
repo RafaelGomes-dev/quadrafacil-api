@@ -29,6 +29,15 @@ em ocupações de 30 minutos com chave única por quadra/data/horário, dentro d
 Mensalistas materializam apenas a vigência (máximo um ano). Preço da data > semanal > padrão.
 O valor da reserva é fixado no servidor e não é recalculado por alteração de preço posterior.
 
+O front envia `totalEsperado` no checkout. O servidor calcula o total independentemente:
+se houver divergência, retorna 409 e desfaz reservas/pagamentos para permitir revisar
+o novo preço. O campo é opcional para compatibilidade com clientes antigos; não define
+o valor cobrado. Faz parte da assinatura da chave idempotente.
+
+O PUT do gestor preserva quadra, data, intervalo, tipo e origem de eventos existentes.
+Mudanças de agenda exigem cancelar e criar outra reserva; editar preços não altera
+reservas anteriores. Confirmação do checkout independe da releitura dos painéis.
+
 ## Financeiro e inteligência
 
 Financeiro do gestor deve usar reservas e mensalidades persistidas, sem descontar taxa do dono.

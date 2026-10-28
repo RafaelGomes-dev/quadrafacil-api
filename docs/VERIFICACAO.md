@@ -2,7 +2,7 @@
 
 ## Testes automatizados
 
-- API: `node --test`, 43 testes aprovados.
+- API: `node --test`, 45 testes aprovados.
 - Front: `node --test`, 60 testes aprovados.
 - Front: build Vite concluído; lint sem erros, com quatro avisos já existentes de
   `set-state-in-effect` em páginas de quadras.
@@ -23,6 +23,10 @@ cookies/localStorage compartilhados. Scripts no repo do front:
   na faixa de R$ 100 a R$ 200; detalhe mantém somente horários compatíveis. Editar
   mensalista mantém duas versões da agenda e uma única mensalidade no extrato.
   Recarregamento confirmado e nenhum erro de JavaScript.
+- `scripts/verificar-checkout.mjs`: altera o preço enquanto o checkout está aberto,
+  confirma erro 409 sem reserva nem pagamento gravado e exige revisão do novo total.
+  A segunda tentativa confirma uma única reserva. Leituras do painel são interrompidas
+  após o POST bem-sucedido, e a confirmação continua aparecendo. Nenhum erro de JavaScript.
 
 As reservas de teste foram canceladas (histórico mantido); a promoção temporária foi
 removida e a conta da Arena Batel terminou ativa.
@@ -50,6 +54,12 @@ sem cobrança bancária real.
 
 Uma gravação confirmada pela API continua confirmada se a atualização posterior
 da tela falhar; falha na própria gravação continua sendo informada ao usuário.
+
+Reservas existentes não podem mudar de quadra, data, intervalo, tipo ou origem pelo
+PUT do gestor. Para mudar a agenda, é necessário cancelar e criar outra reserva,
+preservando o histórico. O checkout envia `totalEsperado`; divergência com o preço
+calculado no servidor retorna 409 e desfaz toda a transação. O front relê os preços
+e pede nova confirmação. Repetir um checkout já confirmado mantém a idempotência.
 
 ## O que não foi alegado
 
