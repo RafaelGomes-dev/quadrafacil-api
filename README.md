@@ -1,274 +1,133 @@
-# QuadraFacil API
+# QuadraFácil API
 
-API REST do **QuadraFacil**, um "Airbnb de quadras esportivas": conecta jogadores/organizadores que
-querem reservar uma quadra (society, futsal, campo, vôlei, beach tennis, basquete) a gestores/proprietários
-que administram a agenda e os pagamentos dessas quadras.
+Backend do protótipo acadêmico de reserva de espaços esportivos. Node.js + Express 5,
+com **SQLite em arquivo**, transações e controle de concorrência. O catálogo, reservas,
+agenda, mensalistas, bloqueios, preços, contas de gestores e solicitações são persistidos.
 
-## Descrição do projeto
+## Executar
 
-Hoje, reservar uma quadra costuma passar por WhatsApp, conferência manual de Pix e risco de dois grupos
-marcarem o mesmo horário por engano. O QuadraFacil resolve isso com busca por filtros, reserva online,
-pagamento integrado (simulado nesta etapa) e bloqueio automático de horário, evitando conflitos e no-show.
+Requer **Node.js 24 LTS** (usa o módulo nativo `node:sqlite`) e npm.
 
-Esta API fornece o backend para:
-
-- **Jogador/organizador**: buscar quadras, ver horários livres, criar reserva e pagar.
-- **Gestor/proprietário**: cadastrar quadras e acompanhar reservas/ocupação.
-
-## Stack utilizada
-
-- Node.js + Express 5 (CommonJS)
-- dotenv (variáveis de ambiente)
-- cors
-- nodemon (ambiente de desenvolvimento)
-- Dados em memória (mock) — sem banco de dados nesta etapa
-
-## Pré-requisitos
-
-- Node.js 18 ou superior
-- npm 9 ou superior
-
-## Instalação de dependências
-
-```bash
-npm install
-```
-
-## Comandos para rodar localmente
-
-```bash
-# ambiente de desenvolvimento (reinicia automaticamente com nodemon)
+```sh
+npm ci
+# Copiar .env.example para .env (ou definir as variáveis abaixo).
 npm run dev
-
-# produção
-npm start
 ```
 
-A API sobe por padrão em `http://localhost:3001`.
+Ou `npm start`, sem reinício automático. API em `http://localhost:3001/api`.
+No Windows, se a política do PowerShell bloquear npm.ps1, use `npm.cmd`.
 
-## Testes automatizados
+| Variável | Padrão | Uso |
+|---|---|---|
+| PORT | 3001 | Porta HTTP |
+| CORS_ORIGIN | http://localhost:5173 | Origem permitida do front |
+| DB_PATH | data/quadrafacil.sqlite (absoluto, relativo ao repo) | Arquivo SQLite |
 
-Os testes usam o test runner nativo do Node, sem precisar instalar nada a mais:
+O servidor escuta apenas em `127.0.0.1`. `DATABASE_URL` e `API_SECRET` da versão antiga
+não são usados nesta etapa. Não precisa instalar PostgreSQL ou Docker.
 
-```bash
+Na primeira execução, o esquema é criado/versionado e `src/data/seed.json` é importado
+uma única vez. **Reiniciar a API não apaga dados.** O arquivo SQLite, seus arquivos WAL
+e SHM e o `.env` não são versionados. Para backup, pare o servidor e copie a pasta `data/`.
+Não apague o banco durante a apresentação. O seed é fictício e tem datas de referência;
+não regenera reservas automaticamente a cada dia.
+
+## Demonstração integrada
+
+O gestor fixo administra **Arena Batel**, ID `arena-batel`, conta `gestor-arena-batel`:
+
+- Quadra 1, ID 1: Society aberta, R$ 180/h padrão.
+- Quadra 2, ID 2: Society coberta, R$ 120/h padrão.
+- Quadra 3, ID 4: Beach tennis, R$ 90/h padrão.
+
+Jogador: `http://localhost:5173/user`. Gestor: `/gestor`. Equipe: `/superadmin`.
+A barra DEMO alterna perfis sem login. Reservas de outros estabelecimentos não aparecem
+no gestor da Arena Batel. Para a apresentação, reserve na Arena Batel.
+
+## Rotas
+
+Base: `/api`. Erros de validação retornam 400, inexistência 404, conflito/revisão antiga 409,
+e quadra/conta indisponível 403.
+
+| Método | Rota | Função |
+|---|---|---|
+| GET | /health | Saúde e modo de persistência |
+| GET | /quadras | Catálogo com cidade, bairro, esporte, cobertura (`true`/`false`), preço, data e horário |
+| GET | /quadras/:id | Detalhe e regras de preço |
+| GET | /quadras/:id/horarios?data=AAAA-MM-DD | Livres, ocupados e cotação por horário |
+| POST | /quadras | Adiciona quadra ao estabelecimento do gestor de demonstração |
+| GET | /reservas?quadraId=... | Histórico de reservas avulsas |
+| POST | /reservas | Cria uma reserva pendente de uma hora |
+| PATCH | /reservas/:id/cancelar | Cancela, mantém histórico e libera horário |
+| POST | /pagamentos | Confirma pagamento simulado de reserva pendente |
+| POST | /checkout | Reserva e confirma múltiplos horários em uma transação |
+| GET/PUT | /gestor | Estado da Arena Batel: estabelecimento, quadras, eventos, regras e mensalistas |
+| GET/PUT | /admin | Contas, limites, planos, patrocínio e premissas financeiras |
+| POST | /interesses | Espera/mensalista, sem envio de mensagem |
+| POST | /suporte | Registra solicitação de suporte, sem envio de e-mail |
+
+Checkout:
+
+```json
+{
+  "chave": "identificador-unico-do-pedido",
+  "nomeCliente": "Rafael Maluf",
+  "telefoneCliente": "41999998888",
+  "metodo": "pix",
+  "itens": [
+    {"quadraId": "1", "data": "2027-03-15", "horario": "08:00"},
+    {"quadraId": "1", "data": "2027-03-15", "horario": "09:00"}
+  ]
+}
+```
+
+São aceitos até 24 itens do mesmo estabelecimento. Em caso de conflito, **nenhum item**
+é confirmado. Repetir o mesmo pedido com a mesma chave retorna a mesma resposta sem
+criar novas reservas ou pagamentos. Alterar o pedido exige uma nova chave.
+
+O servidor calcula o valor; não aceita o preço do cliente. Regras por data prevalecem
+sobre semanais e sobre o preço padrão. Reservas preservam o preço contratado.
+Cancelamento pago marca `reembolso: pendente`, sem devolução real.
+
+PUT do gestor/admin recebe o objeto retornado pelo GET, incluindo `revisao`. Uma edição
+concorrente causa 409; recarregue e reaplique a mudança. Quadras devem ser pausadas e
+contas revogadas, em vez de apagar histórico. Mensalistas têm vigência máxima de um ano;
+as ocorrências e exceções ocupam a grade, assim como bloqueios e reservas. Ocupações
+de 30 minutos possuem chave única de quadra/data/minuto no banco.
+
+## Estrutura e testes
+
+`server.js` inicia `src/persistence/routes.js`. A pasta `src/persistence/` reúne esquema,
+repositório e regras transacionais. `src/data/seed.json` contém os exemplos iniciais.
+Os services/controllers em memória da primeira entrega e `src/app.js` permanecem como
+histórico e para os testes originais; **não são o caminho do servidor atual**.
+
+```sh
 npm test
 ```
 
-Eles sobem a API em uma porta aleatória e cobrem as rotas de quadras, reservas e pagamentos,
-incluindo os casos de erro (dados inválidos, conflito de horário e pagamento duplicado).
+Além dos testes originais, `test/persistencia.test.js` executa SQLite real temporário,
+HTTP local, checkout concorrente, rollback, recorrências, bloqueios, cotação, limites,
+revogação, revisões e persistência após fechar/reabrir. Não usa o banco de demonstração.
 
-## Variáveis de ambiente
+## Limites conscientes
 
-Copie `.env.example` para `.env` e ajuste se necessário:
+- Sem autenticação/autorização de produção: os perfis são de demonstração e a API expõe
+  dados do protótipo. Não publicar na Internet nem inserir dados pessoais reais.
+- Pagamentos, repasses e reembolsos continuam simulados; nenhuma cobrança é realizada.
+- Interesse e suporte são salvos; não há disparo automático de mensagens.
+- O gestor de demonstração é fixo; criar uma conta no superadmin não abre outra sessão.
+- Inteligência histórica e projeção financeira do superadmin continuam ilustrativas.
+- SQLite é suficiente para a apresentação local; a escolha não equivale a validar
+  arquitetura de produção, múltiplas instâncias ou escalabilidade.
 
-| Variável       | Descrição                                                | Valor padrão            |
-| -------------- | -------------------------------------------------------- | ----------------------- |
-| `PORT`         | Porta em que a API escuta                                | `3001`                  |
-| `NODE_ENV`     | Ambiente de execução                                     | `development`           |
-| `DATABASE_URL` | URL de conexão com o banco (ainda não usada nesta etapa) | -                       |
-| `API_SECRET`   | Segredo usado para assinaturas/tokens futuros            | -                       |
-| `CORS_ORIGIN`  | Origem do frontend liberada no CORS                      | `http://localhost:5173` |
+## Equipe e fluxo
 
-## Estrutura de pastas
+Rafael Gomes: base inicial da API e frontend. Rafael Maluf: redesign e fluxos atuais do
+front, integração persistente, validações e testes com assistência de desenvolvimento.
+Henry Mendes: protótipo/documentação. Tiago Dagnoluzzo: testes/documentação.
+Erick Meister: documentação/ajustes.
 
-```
-quadrafacil-api/
-├── server.js                  → ponto de entrada: carrega .env e inicia o servidor HTTP
-├── src/
-│   ├── app.js                 → configuração do Express (middlewares, rotas, 404, errorHandler)
-│   ├── routes/                → define os endpoints HTTP e os associa aos controllers
-│   │   ├── index.js           → agrega todas as rotas sob o prefixo /api e expõe /health
-│   │   ├── quadras.js
-│   │   ├── reservas.js
-│   │   └── pagamentos.js
-│   ├── controllers/           → recebe req/res, chama os services e formata a resposta JSON
-│   │   ├── quadraController.js
-│   │   ├── reservaController.js
-│   │   └── pagamentoController.js
-│   ├── services/              → regras de negócio puras (filtros, conflito de horário, pagamento mock)
-│   │   ├── quadraService.js
-│   │   ├── reservaService.js
-│   │   └── pagamentoService.js
-│   ├── data/
-│   │   └── mockData.js        → "banco de dados" em memória: quadras, reservas e pagamentos
-│   ├── middlewares/
-│   │   ├── cors.js            → libera apenas a origem definida em CORS_ORIGIN
-│   │   └── errorHandler.js    → captura erros não tratados e responde 500 em JSON
-│   └── config/
-│       └── database.js        → lê DATABASE_URL do .env; PostgreSQL entra no MVP
-├── .env.example                → modelo de variáveis de ambiente (versionado)
-├── .env                         → variáveis reais (NÃO versionado)
-└── .prettierrc                  → regras de formatação
-```
-
-## Endpoints
-
-Base URL: `http://localhost:3001/api`
-
-| Método | Rota                     | Descrição                                          | Status de sucesso | Status de erro                      |
-| ------ | ------------------------ | -------------------------------------------------- | ----------------- | ----------------------------------- |
-| GET    | `/health`                | Verifica se a API está no ar                       | 200               | -                                   |
-| GET    | `/quadras`               | Lista quadras com filtros opcionais (query string) | 200               | -                                   |
-| GET    | `/quadras/:id`           | Detalha uma quadra                                 | 200               | 404 (não encontrada)                |
-| GET    | `/quadras/:id/horarios`  | Horários livres/ocupados de uma quadra em uma data | 200               | 400 (`data` ausente/inválida), 404  |
-| POST   | `/quadras`               | Cadastra uma nova quadra                           | 201               | 400 (dados inválidos)               |
-| GET    | `/reservas`              | Lista reservas (aceita `?quadraId=`)               | 200               | -                                   |
-| POST   | `/reservas`              | Cria uma reserva (status inicial "pendente")       | 201               | 400, 409 (conflito)                 |
-| PATCH  | `/reservas/:id/cancelar` | Cancela uma reserva, liberando o horário           | 200               | 400 (já cancelada), 404             |
-| POST   | `/pagamentos`            | Simula o pagamento e confirma a reserva vinculada  | 201               | 400, 404, 409 (pagamento duplicado) |
-
-### GET /api/health
-
-Resposta 200:
-
-```json
-{ "status": "API running!" }
-```
-
-### GET /api/quadras?cidade=Curitiba&esporte=society&precoMin=100&precoMax=200&data=2026-10-10&horario=19:00
-
-Resposta 200:
-
-```json
-[
-  {
-    "id": 1,
-    "nome": "Arena Batel Society",
-    "endereco": "Rua Comendador Araújo, 540",
-    "cidade": "Curitiba",
-    "bairro": "Batel",
-    "esporte": "society",
-    "precoHora": 180,
-    "estrutura": {
-      "vestiario": true,
-      "estacionamento": true,
-      "iluminacao": true,
-      "coberta": false
-    },
-    "fotos": ["https://picsum.photos/seed/arena-batel/600/400"],
-    "horarioFuncionamento": { "abertura": "08:00", "fechamento": "23:00" },
-    "descricao": "Grama sintética premium, a 5 minutos do Shopping Curitiba."
-  }
-]
-```
-
-### GET /api/quadras/999
-
-Resposta 404:
-
-```json
-{ "error": "Quadra não encontrada." }
-```
-
-### GET /api/quadras/1/horarios?data=2026-10-10
-
-Resposta 200 (só aparecem horários dentro do funcionamento da quadra):
-
-```json
-{
-  "horariosLivres": ["08:00", "09:00", "10:00", "..."],
-  "horariosOcupados": ["19:00"]
-}
-```
-
-### POST /api/quadras
-
-Request body:
-
-```json
-{
-  "nome": "Arena Teste",
-  "endereco": "Rua Exemplo, 123",
-  "cidade": "Curitiba",
-  "bairro": "Centro",
-  "esporte": "society",
-  "precoHora": 150,
-  "estrutura": { "vestiario": true, "estacionamento": false, "iluminacao": true, "coberta": false },
-  "horarioFuncionamento": { "abertura": "08:00", "fechamento": "22:00" }
-}
-```
-
-`horarioFuncionamento` é opcional (padrão: 08:00 às 22:00). Se enviado, `abertura` e `fechamento`
-precisam estar no formato HH:mm e o fechamento tem que ser depois da abertura.
-
-Resposta 201: a quadra criada, com `id` incremental.
-
-Resposta 400 (ex.: `precoHora` ausente ou ≤ 0):
-
-```json
-{
-  "error": "Dados inválidos.",
-  "detalhes": ["O campo \"precoHora\" precisa ser um número maior que zero."]
-}
-```
-
-### POST /api/reservas
-
-Request body:
-
-```json
-{
-  "quadraId": 1,
-  "nomeCliente": "João Silva",
-  "telefoneCliente": "41999999999",
-  "data": "2026-10-15",
-  "horario": "19:00"
-}
-```
-
-Resposta 201: a reserva criada com `status: "pendente"`.
-
-Resposta 409 (mesma quadra/data/horário já reservados):
-
-```json
-{ "error": "Este horário já está reservado para esta quadra." }
-```
-
-### PATCH /api/reservas/:id/cancelar
-
-Resposta 200: a reserva com `status: "cancelada"`.
-
-Resposta 400 (a reserva já estava cancelada):
-
-```json
-{ "error": "Esta reserva já está cancelada." }
-```
-
-### POST /api/pagamentos
-
-Request body:
-
-```json
-{ "reservaId": 2, "metodo": "pix" }
-```
-
-Resposta 201: o pagamento criado com `status: "aprovado"` (a reserva vinculada passa para `"confirmada"`).
-
-Uma segunda tentativa de pagamento para a mesma reserva retorna 409 e não cria outra cobrança.
-
-## Fluxo de branches e padrão de commits
-
-- `main`: código estável, pronto para entrega.
-- `develop`: integração das features antes de ir para `main`.
-- `feat/<nome-da-feature>`, `docs/<assunto>`, `style/<assunto>`: branches de trabalho, sempre a partir de `develop`,
-  mescladas de volta com `merge --no-ff`.
-
-Commits seguem [Conventional Commits](https://www.conventionalcommits.org/) em português:
-
-```
-feat: adiciona rota de listagem de quadras
-fix: corrige validação de preço por hora
-docs: atualiza README com tabela de endpoints
-refactor: extrai validação de reserva para o service
-chore: configura prettier
-```
-
-## Equipe
-
-| Nome             | Função                                            | GitHub           |
-| ---------------- | ------------------------------------------------- | ---------------- |
-| Rafael Gomes     | Back-end, regras de negócio e documentação da API | RafaelGomes-dev  |
-| Rafael Maluf     | Organização do Trello, validações e testes        | RafaMaluf        |
-| Henry Mendes     | Protótipo e documentação                          | HenryMendesr     |
-| Tiago Dagnoluzzo | Testes da API e documentação                      | tiago-dagnoluzzo |
-| Erick Meister    | Documentação e ajustes técnicos                   | Minimeister05    |
+Trabalhar em branches `feat/...` a partir de `develop`, PR para `develop` e integração
+posterior em `main`. Commits seguem Conventional Commits, com autoria real.
+Detalhes de integração: [docs/INTEGRACAO.md](docs/INTEGRACAO.md).
