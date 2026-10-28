@@ -2,9 +2,9 @@ const express = require('express');
 const { operacao } = require('./operacao');
 const { abrirBanco } = require('./database');
 
-function criarAppPersistente(db = abrirBanco()) {
+function criarAppPersistente(db = abrirBanco(), opcoes = {}) {
   const app = express();
-  const service = operacao(db);
+  const service = operacao(db, opcoes);
   app.use(require('../middlewares/cors'));
   app.use(express.json({ limit: '8mb' }));
   const router = express.Router();

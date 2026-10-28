@@ -1,5 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const { transacao } = require('./database');
+const { instanteLocal } = require('./relogio');
+const { mensalidadesDoMes } = require('./mensalidades');
 
 class ErroOperacao extends Error {
   constructor(status, message) {
@@ -23,10 +25,6 @@ const minutos = (h) =>
 const hora = (m) =>
   `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const proximoDia = (d) => new Date(Date.parse(d) + 86400000).toISOString().slice(0, 10);
-const hoje = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 const diaSemana = (d) => new Date(`${d}T12:00:00Z`).getUTCDay();
 const normalizar = (s) =>
   String(s || '')
@@ -34,7 +32,9 @@ const normalizar = (s) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
-function operacao(db) {
+function operacao(db, { agora = () => new Date() } = {}) {
+  const hoje = () => instanteLocal(agora()).slice(0, 10);
+  const inicioFuturo = (data, horario) => `${data}T${horario}:00` > instanteLocal(agora());
   const todos = (table) =>
     db
       .prepare(`SELECT dados FROM ${table}`)
@@ -223,6 +223,7 @@ function operacao(db) {
       m += 60
     ) {
       const h = hora(m);
+      if (!inicioFuturo(data, h)) continue;
       const busy = db
         .prepare(
           'SELECT 1 FROM ocupacoes WHERE quadra_id=? AND data=? AND minuto>=? AND minuto<? LIMIT 1'
@@ -234,6 +235,11 @@ function operacao(db) {
     return { horariosLivres: livres, horariosOcupados: ocupados, precos };
   }
   function listarQuadras(f = {}) {
+    // Horário sem data corresponde a hoje em Curitiba, nunca a um filtro ignorado.
+    if (f.horario && !f.data) f = { ...f, data: hoje() };
+    const compativelPreco = (valor) =>
+      (f.precoMin === undefined || f.precoMin === '' || valor >= Number(f.precoMin)) &&
+      (f.precoMax === undefined || f.precoMax === '' || valor <= Number(f.precoMax));
     for (const campo of ['precoMin', 'precoMax'])
       if (f[campo] !== undefined && f[campo] !== '')
         exigir(
@@ -241,6 +247,13 @@ function operacao(db) {
           'Filtro de preço inválido.'
         );
     if (f.data) exigir(dataValida(f.data), 'Data inválida.');
+    if (
+      f.precoMin !== undefined &&
+      f.precoMax !== undefined &&
+      f.precoMin !== '' &&
+      f.precoMax !== ''
+    )
+      exigir(Number(f.precoMin) <= Number(f.precoMax), 'O preço mínimo não pode superar o máximo.');
     if (f.horario) exigir(Number.isFinite(minutos(f.horario)), 'Horário inválido.');
     return quadras()
       .filter(
@@ -254,9 +267,10 @@ function operacao(db) {
         if (!f.data) return q;
         const g = grade(q.id, f.data),
           hs = f.horario ? [f.horario] : g.horariosLivres;
-        const precos = hs
+        const horariosCompativeis = hs
           .filter((h) => g.horariosLivres.includes(h))
-          .map((h) => cotacao(q, f.data, h));
+          .filter((h) => compativelPreco(cotacao(q, f.data, h).valor));
+        const precos = horariosCompativeis.map((h) => cotacao(q, f.data, h));
         const c = precos.sort((a, b) => a.valor - b.valor)[0];
         return c
           ? {
@@ -265,6 +279,7 @@ function operacao(db) {
               promocao: c.promocao,
               rotuloPromocao: c.rotulo,
               precoAPartirDe: !f.horario,
+              horariosCompativeis,
             }
           : null;
       })
@@ -283,6 +298,7 @@ function operacao(db) {
       'Escolha uma data válida que não esteja no passado.'
     );
     exigir(Number.isFinite(minutos(d.horario)), 'Horário inválido.');
+    exigir(inicioFuturo(d.data, d.horario), 'Este horário já começou. Escolha um horário futuro.');
     const nome = String(d.nomeCliente || '').trim(),
       telefone = String(d.telefoneCliente || '').replace(/\D/g, '');
     exigir(nome.length >= 3 && /^\d{10,11}$/.test(telefone), 'Informe nome e telefone com DDD.');
@@ -325,7 +341,13 @@ function operacao(db) {
     exigir(['pix', 'cartao'].includes(metodo), 'Selecione Pix ou cartão.');
     const e = buscar('eventos', id);
     exigir(e, 'Reserva não encontrada.', 404);
+    exigir(e.tipo === 'avulsa', 'Somente reservas avulsas podem receber pagamento por esta rota.');
     exigir(e.status !== 'cancelada', 'Não é possível pagar uma reserva cancelada.');
+    exigir(e.pagamento !== 'pago', 'Esta reserva já está paga.', 409);
+    exigir(
+      e.origem !== 'QuadraFácil' || inicioFuturo(e.data, e.inicio),
+      'O horário desta reserva já começou.'
+    );
     exigir(
       !db.prepare('SELECT 1 FROM pagamentos WHERE reserva_id=?').get(String(id)),
       'Esta reserva já possui um pagamento aprovado.',
@@ -348,12 +370,16 @@ function operacao(db) {
   function gestor() {
     const qs = todos('quadras').filter((q) => q.estabelecimentoId === 'arena-batel');
     const ids = new Set(qs.map((q) => String(q.id)));
+    const mensalistas = todos('mensalistas')
+      .filter((e) => ids.has(String(e.quadraId)))
+      .map((m) => ({ ...m, contratoId: m.contratoId || m.id }));
     return {
       estabelecimento: buscar('estabelecimentos', 'arena-batel'),
       quadras: qs,
       eventos: todos('eventos').filter((e) => ids.has(String(e.quadraId))),
       regras: todos('regras').filter((e) => ids.has(String(e.quadraId))),
-      mensalistas: todos('mensalistas').filter((e) => ids.has(String(e.quadraId))),
+      mensalistas,
+      mensalidades: mensalidadesDoMes(mensalistas, hoje()),
       revisao: revisao(),
     };
   }
@@ -429,6 +455,11 @@ function operacao(db) {
         const q = s.quadras.find((q) => String(q.id) === String(e.quadraId));
         intervalo(e, q);
         if (table === 'eventos') {
+          if (!antigo && e.status !== 'cancelada' && e.tipo !== 'mensalista')
+            exigir(
+              inicioFuturo(e.data, e.inicio),
+              'Não é possível criar uma reserva ou bloqueio em horário passado.'
+            );
           exigir(
             dataValida(e.data) &&
               ['avulsa', 'bloqueio', 'mensalista'].includes(e.tipo) &&
@@ -449,6 +480,22 @@ function operacao(db) {
             e.valor = Math.round(valor * 100) / 100;
           }
         } else if (table === 'mensalistas') {
+          const contratoAnterior = antigo?.contratoId || antigo?.id;
+          if (antigo)
+            exigir(
+              !e.contratoId || e.contratoId === contratoAnterior,
+              'O contrato da recorrência não pode ser alterado.'
+            );
+          else if (e.contratoId && e.contratoId !== e.id) {
+            const anterior = buscar('mensalistas', e.versaoAnteriorId);
+            exigir(
+              anterior &&
+                (anterior.contratoId || anterior.id) === e.contratoId &&
+                anteriores.mensalistas.some((m) => m.id === anterior.id),
+              'Origem da alteração de recorrência inválida.'
+            );
+          }
+          e.contratoId = contratoAnterior || e.contratoId || e.id;
           exigir(
             dataValida(e.de) &&
               dataValida(e.ate) &&
@@ -484,6 +531,13 @@ function operacao(db) {
       anteriores.eventos.every((e) => s.eventos.some((n) => String(n.id) === String(e.id))),
       'Cancele reservas em vez de excluir o histórico.'
     );
+    for (const [i, m] of s.mensalistas.entries())
+      exigir(
+        !s.mensalistas
+          .slice(i + 1)
+          .some((n) => n.contratoId === m.contratoId && m.de <= n.ate && n.de <= m.ate),
+        'Versões do mesmo contrato não podem ter vigências sobrepostas.'
+      );
   }
   function salvarGestor(s) {
     return transacao(db, () => {
@@ -626,6 +680,17 @@ function operacao(db) {
         exigir(
           Array.isArray(d.itens) && d.itens.length > 0 && d.itens.length <= 24,
           'Selecione entre 1 e 24 horários.'
+        );
+        exigir(
+          d.itens.every(
+            (i) =>
+              i &&
+              !Array.isArray(i) &&
+              (typeof i.quadraId === 'string' || typeof i.quadraId === 'number') &&
+              dataValida(i.data) &&
+              Number.isFinite(minutos(i.horario))
+          ),
+          'Cada item precisa de quadra, data e horário válidos.'
         );
         const estabelecimentos = new Set(
           d.itens.map((i) => buscar('quadras', i.quadraId)?.estabelecimentoId)
