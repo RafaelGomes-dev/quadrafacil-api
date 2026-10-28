@@ -8,9 +8,23 @@ const require = createRequire(import.meta.url);
 const { quadras } = require('../src/data/mockData.js');
 const gestor = dadosIniciais();
 const admin = contasIniciais();
-const extras = quadras.filter(q => !gestor.quadras.some(a => a.id === q.id)).map(q => ({
-  ...q, estabelecimentoId: `quadra-${q.id}`, estabelecimentoNome: q.nome, ativa: true,
-}));
-writeFileSync(new URL('../src/data/seed.json', import.meta.url), JSON.stringify({
-  gestor, admin, outrasQuadras: [...extras, ...gerarQuadrasCatalogo(admin.contas)],
-}, null, 2) + '\n');
+const extras = quadras
+  .filter((q) => !gestor.quadras.some((a) => a.id === q.id))
+  .map((q) => ({
+    ...q,
+    estabelecimentoId: `quadra-${q.id}`,
+    estabelecimentoNome: q.nome,
+    ativa: true,
+  }));
+writeFileSync(
+  new URL('../src/data/seed.json', import.meta.url),
+  JSON.stringify(
+    {
+      gestor,
+      admin,
+      outrasQuadras: [...extras, ...gerarQuadrasCatalogo(admin.contas)],
+    },
+    null,
+    2
+  ) + '\n'
+);

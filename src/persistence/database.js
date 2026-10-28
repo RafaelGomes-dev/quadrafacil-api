@@ -2,7 +2,9 @@ const { DatabaseSync } = require('node:sqlite');
 const { mkdirSync } = require('node:fs');
 const { dirname, resolve } = require('node:path');
 
-function abrirBanco(filename = process.env.DB_PATH || resolve(__dirname, '../../data/quadrafacil.sqlite')) {
+function abrirBanco(
+  filename = process.env.DB_PATH || resolve(__dirname, '../../data/quadrafacil.sqlite')
+) {
   if (filename !== ':memory:') mkdirSync(dirname(filename), { recursive: true });
   const db = new DatabaseSync(filename);
   db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
@@ -18,12 +20,20 @@ function abrirBanco(filename = process.env.DB_PATH || resolve(__dirname, '../../
     CREATE TABLE IF NOT EXISTS metadados (chave TEXT PRIMARY KEY, dados TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS interesses (chave TEXT PRIMARY KEY, dados TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS suporte (id TEXT PRIMARY KEY, dados TEXT NOT NULL);
-    INSERT OR IGNORE INTO migracoes VALUES(1);`);
+    CREATE TABLE IF NOT EXISTS checkouts (chave TEXT PRIMARY KEY, pedido TEXT NOT NULL, resposta TEXT NOT NULL);
+    INSERT OR IGNORE INTO migracoes VALUES(1);
+    INSERT OR IGNORE INTO migracoes VALUES(2);`);
   return db;
 }
 function transacao(db, fn) {
   db.exec('BEGIN IMMEDIATE');
-  try { const result = fn(); db.exec('COMMIT'); return result; }
-  catch (error) { db.exec('ROLLBACK'); throw error; }
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
 }
 module.exports = { abrirBanco, transacao };
