@@ -95,6 +95,14 @@ contas revogadas, em vez de apagar histórico. Mensalistas têm vigência máxim
 as ocorrências e exceções ocupam a grade, assim como bloqueios e reservas. Ocupações
 de 30 minutos possuem chave única de quadra/data/minuto no banco.
 
+Disponibilidade e início das reservas usam o horário de Curitiba (`America/Sao_Paulo`).
+Novas reservas e bloqueios não podem começar no passado; pagamentos simulados também
+recusam reservas que já começaram. A faixa de preço é aplicada por horário disponível.
+
+Versões de um mensalista compartilham `contratoId`. O extrato gera uma mensalidade por
+contrato/mês. Reajustes no meio do mês passam a valer no próximo mês, sem proporcional;
+editar a recorrência não duplica a cobrança nem apaga o recebimento já registrado.
+
 ## Estrutura e testes
 
 `server.js` inicia `src/persistence/routes.js`. A pasta `src/persistence/` reúne esquema,
@@ -109,6 +117,8 @@ npm test
 Além dos testes originais, `test/persistencia.test.js` executa SQLite real temporário,
 HTTP local, checkout concorrente, rollback, recorrências, bloqueios, cotação, limites,
 revogação, revisões e persistência após fechar/reabrir. Não usa o banco de demonstração.
+`test/regressoes-operacao.test.js` cobre relógio, faixa de preços, versões de mensalistas
+e pagamentos inválidos. Evidências e limites: [docs/VERIFICACAO.md](docs/VERIFICACAO.md).
 
 ## Limites conscientes
 
